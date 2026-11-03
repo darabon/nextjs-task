@@ -2,9 +2,16 @@
 
 import { ObjectId } from "mongodb";
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
+import { createClientId, getClientId, rememberClientId } from "@/lib/booking";
+import { ACTIVE_APPOINTMENT_STATUSES } from "@/lib/constants";
+import {
+  findActiveAppointmentByPhone,
+  getClientAppointment,
+  getSettings,
+} from "@/lib/data";
+import { formatDate, phoneKey, todayISO } from "@/lib/format";
 import { getDb } from "@/lib/mongodb";
-import { getSettings } from "@/lib/data";
-import { todayISO } from "@/lib/format";
 import type { BookingState } from "@/lib/types";
 
 function text(formData: FormData, key: string): string {
@@ -110,9 +117,35 @@ export async function createAppointment(
       stylistName = String(stylist.name ?? "");
     }
 
+    const existingClientId = await getClientId();
+    const clientId = existingClientId ?? createClientId();
+
+    if (existingClientId) {
+      const ownBooking = await getClientAppointment(existingClientId);
+      if (ownBooking) {
+        return {
+          status: "error",
+          message: `У вас уже есть активная запись на ${formatDate(ownBooking.date)} в ${ownBooking.time}. Отмените её на странице «Записаться», чтобы выбрать новое время.`,
+        };
+      }
+    }
+
+    const samePhoneBooking = await findActiveAppointmentByPhone(phone);
+    if (samePhoneBooking) {
+      return {
+        status: "error",
+        message:
+          "На этот номер уже есть активная запись. Откройте страницу «Записаться» в том же браузере, где оформляли запись, чтобы отменить её или выбрать другое время.",
+      };
+    }
+
+    await rememberClientId(clientId);
+
     await db.collection("appointments").insertOne({
       name,
       phone,
+      phoneKey: phoneKey(phone),
+      clientId,
       serviceId,
       serviceTitle: String(service.title ?? ""),
       stylistId,
@@ -126,17 +159,6 @@ export async function createAppointment(
 
     revalidatePath("/admin");
     revalidatePath("/admin/appointments");
-
-    return {
-      status: "success",
-      appointment: {
-        name,
-        serviceTitle: String(service.title ?? ""),
-        stylistName,
-        date,
-        time,
-      },
-    };
   } catch (error) {
     console.error("Booking error", error);
     return {
@@ -145,4 +167,43 @@ export async function createAppointment(
         "Не получилось отправить заявку. Позвоните нам — мы всё оформим вручную.",
     };
   }
+
+  redirect("/book#booking");
+}
+
+export async function cancelMyAppointment(): Promise<void> {
+  let result: "cancelled" | "missing" | "notfound" | "error" = "error";
+
+  try {
+    const clientId = await getClientId();
+
+    if (!clientId) {
+      result = "missing";
+    } else {
+      const db = await getDb();
+      const updated = await db.collection("appointments").updateMany(
+        {
+          clientId,
+          status: { $in: [...ACTIVE_APPOINTMENT_STATUSES] },
+        },
+        {
+          $set: {
+            status: "cancelled",
+            cancelledBy: "client",
+            cancelledAt: new Date(),
+            updatedAt: new Date(),
+          },
+        },
+      );
+      result = updated.modifiedCount > 0 ? "cancelled" : "notfound";
+    }
+  } catch (error) {
+    console.error("Cancel booking error", error);
+  }
+
+  revalidatePath("/book");
+  revalidatePath("/admin");
+  revalidatePath("/admin/appointments");
+
+  redirect(`/book?cancel=${result}#booking`);
 }

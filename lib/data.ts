@@ -1,4 +1,6 @@
 import { ObjectId } from "mongodb";
+import { ACTIVE_APPOINTMENT_STATUSES } from "@/lib/constants";
+import { phoneKey, todayISO } from "@/lib/format";
 import { getDb } from "@/lib/mongodb";
 import type {
   Appointment,
@@ -118,6 +120,49 @@ function mapAppointment(doc: Record<string, unknown>): Appointment {
     status: (doc.status ?? "new") as AppointmentStatus,
     createdAt,
   };
+}
+
+function activeFilter() {
+  return {
+    status: { $in: [...ACTIVE_APPOINTMENT_STATUSES] },
+    date: { $gte: todayISO() },
+  };
+}
+
+export async function getClientAppointment(
+  clientId: string,
+): Promise<Appointment | null> {
+  const db = await getDb();
+  const doc = await db.collection("appointments").findOne(
+    { ...activeFilter(), clientId },
+    { sort: { date: 1, time: 1 } },
+  );
+
+  return doc ? mapAppointment(doc) : null;
+}
+
+export async function findActiveAppointmentByPhone(
+  phone: string,
+): Promise<Appointment | null> {
+  const key = phoneKey(phone);
+  const db = await getDb();
+  const collection = db.collection("appointments");
+
+  let doc = await collection.findOne(
+    { ...activeFilter(), phoneKey: key },
+    { sort: { date: 1, time: 1 } },
+  );
+
+  // Записи, созданные до появления phoneKey, ищем по нормализованному номеру.
+  if (!doc) {
+    const legacy = await collection
+      .find({ ...activeFilter(), phoneKey: { $exists: false } })
+      .sort({ date: 1, time: 1 })
+      .toArray();
+    doc = legacy.find((item) => phoneKey(String(item.phone ?? "")) === key) ?? null;
+  }
+
+  return doc ? mapAppointment(doc) : null;
 }
 
 export async function listAppointments(

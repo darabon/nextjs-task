@@ -66,13 +66,6 @@ export type Settings = {
 };
 
 export type BookingState = {
-  status: "idle" | "error" | "success";
+  status: "idle" | "error";
   message?: string;
-  appointment?: {
-    name: string;
-    serviceTitle: string;
-    stylistName: string;
-    date: string;
-    time: string;
-  };
 };

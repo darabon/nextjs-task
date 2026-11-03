@@ -433,9 +433,20 @@ try {
     },
   ];
 
-  await db.collection("appointments").insertMany(appointments);
+  await db.collection("appointments").insertMany(
+    appointments.map((appointment) => ({
+      ...appointment,
+      phoneKey: String(appointment.phone).replace(/\D/g, "").slice(-10),
+    })),
+  );
   await db.collection("appointments").createIndex({ date: 1, time: 1 });
   await db.collection("appointments").createIndex({ status: 1 });
+  await db
+    .collection("appointments")
+    .createIndex({ clientId: 1, status: 1, date: 1 });
+  await db
+    .collection("appointments")
+    .createIndex({ phoneKey: 1, status: 1, date: 1 });
 
   const [serviceCount, staffCount, workCount, appointmentCount] =
     await Promise.all([

@@ -1,9 +1,8 @@
 "use client";
 
-import Link from "next/link";
 import { useActionState } from "react";
 import { createAppointment } from "@/app/(site)/book/actions";
-import { formatDate, todayISO } from "@/lib/format";
+import { todayISO } from "@/lib/format";
 import type { BookingState, Service, Settings, Staff } from "@/lib/types";
 
 type BookingFormProps = {
@@ -37,60 +36,6 @@ export function BookingForm({
     createAppointment,
     initialState,
   );
-
-  if (state.status === "success" && state.appointment) {
-    return (
-      <div className="success-card">
-        <span className="success-icon" aria-hidden>
-          <svg
-            width="34"
-            height="34"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2.4"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <path d="M5 12.5l4.5 4.5L19 7" />
-          </svg>
-        </span>
-        <h2>Вы записаны!</h2>
-        <p>
-          Мы получили заявку и позвоним, чтобы подтвердить время. Если планы
-          изменятся — просто напишите или позвоните.
-        </p>
-        <div className="success-summary">
-          <div>
-            <span>Имя</span>
-            <span>{state.appointment.name}</span>
-          </div>
-          <div>
-            <span>Услуга</span>
-            <span>{state.appointment.serviceTitle}</span>
-          </div>
-          <div>
-            <span>Мастер</span>
-            <span>{state.appointment.stylistName}</span>
-          </div>
-          <div>
-            <span>Когда</span>
-            <span>
-              {formatDate(state.appointment.date)}, {state.appointment.time}
-            </span>
-          </div>
-        </div>
-        <div style={{ display: "flex", gap: 12, flexWrap: "wrap", justifyContent: "center", marginTop: 26 }}>
-          <Link href="/" className="btn btn-outline btn-sm">
-            На главную
-          </Link>
-          <Link href="/book" className="btn btn-dark btn-sm">
-            Записаться ещё
-          </Link>
-        </div>
-      </div>
-    );
-  }
 
   const categories = Array.from(new Set(services.map((s) => s.category)));
 
@@ -220,7 +165,8 @@ export function BookingForm({
       <div className="form-submit">
         <p>
           Нажимая «Отправить», вы соглашаетесь с обработкой персональных данных.
-          Это демо-заявка, она сохраняется в MongoDB.
+          Демо-заявка сохраняется в MongoDB. На один номер можно оформить одну
+          активную запись; отменить её можно на этой странице в этом браузере.
         </p>
         <button type="submit" className="btn btn-dark" disabled={pending}>
           {pending ? "Отправляем…" : "Отправить"}

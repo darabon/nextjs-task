@@ -26,6 +26,8 @@ export const STATUS_LABELS = {
 
 export const STATUS_ORDER = ["new", "confirmed", "done", "cancelled"] as const;
 
+export const ACTIVE_APPOINTMENT_STATUSES = ["new", "confirmed"] as const;
+
 export const NAV_LINKS = [
   { href: "/team", label: "Наши сотрудники" },
   { href: "/prices", label: "Каталог цен" },

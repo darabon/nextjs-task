@@ -49,3 +49,7 @@ export function plural(
 export function digitsOnly(value: string): string {
   return value.replace(/\D/g, "");
 }
+
+export function phoneKey(value: string): string {
+  return digitsOnly(value).slice(-10);
+}

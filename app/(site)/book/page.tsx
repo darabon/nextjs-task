@@ -1,22 +1,46 @@
 import type { Metadata } from "next";
 import Image from "next/image";
+import { getClientId } from "@/lib/booking";
 import { BookingForm } from "@/components/booking-form";
+import { CurrentBooking } from "@/components/current-booking";
 import { PageHero } from "@/components/page-hero";
-import { getSettings, listServices, listStaff } from "@/lib/data";
+import {
+  getClientAppointment,
+  getSettings,
+  listServices,
+  listStaff,
+} from "@/lib/data";
 
 export const metadata: Metadata = { title: "Записаться" };
 
 export default async function BookPage({
   searchParams,
 }: {
-  searchParams: Promise<{ service?: string; stylist?: string }>;
+  searchParams: Promise<{
+    service?: string;
+    stylist?: string;
+    cancel?: string;
+  }>;
 }) {
   const params = await searchParams;
-  const [services, staff, settings] = await Promise.all([
+  const clientId = await getClientId();
+  const [services, staff, settings, activeBooking] = await Promise.all([
     listServices(true),
     listStaff(true),
     getSettings(),
+    clientId ? getClientAppointment(clientId) : Promise.resolve(null),
   ]);
+
+  const cancelNotice =
+    params.cancel === "cancelled"
+      ? "Запись отменена. Если передумали, выберите новое время ниже."
+      : params.cancel === "missing"
+        ? "В этом браузере нет записи для отмены. Возможно, cookies были очищены."
+        : params.cancel === "notfound"
+          ? "Активная запись не найдена — возможно, она уже отменена или прошла."
+          : params.cancel === "error"
+            ? "Не получилось отменить запись. Попробуйте ещё раз чуть позже."
+            : "";
 
   const defaultService = services.some((s) => s.id === params.service)
     ? params.service
@@ -35,7 +59,7 @@ export default async function BookPage({
             Записаться <span className="accent">к нам</span>
           </>
         }
-        text="Оставьте заявку — мы позвоним, подтвердим время и ответим на все вопросы. Или просто приходите, если хочется спонтанно."
+        text="Оставьте заявку — мы позвоним, подтвердим время и ответим на все вопросы. Если планы изменятся, запись можно отменить здесь же, без звонка."
         tone="lilac"
       >
         <a href={settings.phoneHref} className="btn btn-outline">
@@ -45,14 +69,31 @@ export default async function BookPage({
 
       <section className="page-section">
         <div className="wrap booking-layout">
-          <div className="booking-card">
-            <BookingForm
-              services={services}
-              staff={staff}
-              settings={settings}
-              defaultService={defaultService}
-              defaultStylist={defaultStylist}
-            />
+          <div className="booking-card" id="booking">
+            {cancelNotice && !activeBooking && (
+              <p
+                className={
+                  params.cancel === "cancelled"
+                    ? "booking-notice success"
+                    : "booking-notice error"
+                }
+                role="status"
+              >
+                {cancelNotice}
+              </p>
+            )}
+
+            {activeBooking ? (
+              <CurrentBooking appointment={activeBooking} />
+            ) : (
+              <BookingForm
+                services={services}
+                staff={staff}
+                settings={settings}
+                defaultService={defaultService}
+                defaultStylist={defaultStylist}
+              />
+            )}
           </div>
 
           <aside className="booking-side">
